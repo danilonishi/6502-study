@@ -4,145 +4,156 @@
 	include "macro.h"	; Macros for convencience
 	include "common.h"	; My custom macros
 
-	SEG.U Variables
+; Ram Segment
+	seg.u Variables
 	org $80
-FRC 	ds 1	; Frame Counter
-UPC 	ds 1	; Background Update Counter
-BGV 	ds 1	; Background Value
-PFV 	ds 1	; Playfield Value
-BGO 	ds 1	; Background Scanline Offset
-PFO 	ds 1	; Playfield Scanline Offset
+; byte P0Height
+P0Height ds 1	; 1 byte for p0 height
+; byte P1Height
+P1Height ds 1	; 1 byte for p0 height
 
+; Rom Segment
 	seg code			; initialization segment
 	org $F000			; rom origin
 	
-START:
+Reset:
 
 	CLEAN_START			; Clear Memory macro
-	ldy #4
-	sty UPC
 	
-FrameStart:
+	; P0Height = 10
+	; P1Height = 10
+	lda #10
+	sta P0Height
+	sta P1Height
 	
-	NTSC_START			; Ready to draw frame
+	ldx #$80
+	stx COLUBK
 	
-	ldy UPC
-	dey
-	sty UPC
+	lda #%1111
+	sta COLUPF
 	
-	bne Decoy
-	ldy #4
-	sty UPC
-	ldy BGV
-	iny
-	sty BGV
-	ldy PFV
-	dey
-	sty PFV
-	jmp Run
-Decoy:
-	REPEAT 8
-	nop
-	REPEND
-	jmp Run
-Run:
+	lda #$48
+	sta COLUP0
 	
+	lda #$C6
+	sta COLUP1
 	
-	; Rainbow Reset
+	ldy #%00000010		; CTRLPF D1 1 = score
+	sty CTRLPF
 	
-	
-	;ldy #0
-	;sty BGO
-	;sty PFO
-	
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
-; Drawing
-;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+StartFrame:
 
+	NTSC_START			; Ready to draw frame
+	; >
+
+VisibleScanlines:
+
+	REPEAT 10
+		sta WSYNC
+	REPEND
 	
-	;ldx #$80			; write background color into register x
-	;sty COLUBK			; store background color into TIA buffer
-	
-	; Playfield Settings
-	;lda #$0E			; store color into acc
-	;sta COLUPF			; write acc into playfield color
-	lda #%00000001		; store value into acc
-	sta CTRLPF			; write Acc into playfield Settings
-	
+; SCOREBOARD
+	ldy #0
+ScoreBoardLoop:
+	lda NumberBitmap,Y
+	sta PF1
+	sta WSYNC
+	iny
+	cpy #10
+	bne ScoreBoardLoop
+
 	lda #0
-	ldx #0
-	stx PF0
-	stx PF1
-	stx PF2
-	REPEAT 7
-		
-		ldy BGV,BGO
-		sty COLUBK
-		ldy BGO
-		iny
-		sty BGO
-		
-		ldy PFV,PFO
-		sty COLUPF
-		ldy PFO
-		dey
-		sty PFO
-		
-		lda #0
-		sta WSYNC		
-	REPEND
+	sta PF1
 	
-	ldx #%11100000
-	stx PF0
-	ldx #%11111111
-	stx PF1
-	stx PF2
-	
-	REPEAT 7
-		lda #0
+	REPEAT 50
 		sta WSYNC
 	REPEND
 	
-	ldx #%01100000
-	stx PF0
-	ldx #0
-	stx PF1
-	ldx #%01100000
-	stx PF2
-	REPEAT 164
-		lda #0
-		sta WSYNC
-	REPEND
-	
-	ldx #%11100000
-	stx PF0
-	ldx #%11111111
-	stx PF1
-	stx PF2
-	REPEAT 7
-		lda #0
-		sta WSYNC
-	REPEND
-	
+; PLAYER 0
+	ldy #0
+Player0Loop:
+	lda PlayerBitmap,Y
+	sta GRP0
+	sta WSYNC
+	iny
+	cpy P0Height
+	bne Player0Loop
 	lda #0
-	ldx #0
-	stx PF0
-	stx PF1
-	stx PF2
-	REPEAT 7
+	sta GRP0
+
+; PLAYER 1
+	ldy #0
+Player1Loop:
+	lda PlayerBitmap,Y
+	sta GRP1
+	sta WSYNC
+	iny
+	cpy P1Height
+	bne Player1Loop
+	lda #0
+	sta GRP1
+
+	; 192 - 90
+	REPEAT 102
 		sta WSYNC
 	REPEND
-	
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+	; <
 	NTSC_END
 	
-	jmp FrameStart		; go back to the beginning of the frame
+	jmp StartFrame		; go back to the beginning of the frame
 	
+;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
+	org $FFE8
+PlayerBitmap:
+	.byte #%01111110	;  ###### 
+	.byte #%11111111	; ########
+	.byte #%10011001	; #  ##  #
+	.byte #%11111111	; ########
+	.byte #%11111111	; ########
+	.byte #%11111111	; ########
+	.byte #%10111101	; # #### #
+	.byte #%11000011	; ##    ##
+	.byte #%11111111	; ########
+	.byte #%01111110	;  ###### 
 	
+	org $FFF2
+NumberBitmap:
+	.byte #%00001110	; ###
+	.byte #%00001110	; ###
+	.byte #%00000010	;   #
+	.byte #%00000010	;   #
+	.byte #%00001110	; ###
+	.byte #%00001110	; ###
+	.byte #%00001000	; #  
+	.byte #%00001000	; #  
+	.byte #%00001110	; ###
+	.byte #%00001110	; ###
+	
+	; Actually looks like this:
+	; ##################
+	;             ######
+	; ##################
+	; ######
+	; ##################
 	
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 ; Fill ROM size to exactly 4kb
 ;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;;
 
 	org $FFFC			; Jump to reset pointer
-	.word START			; add word (byte) to reset vector
-	.word START			; add garbage to complete $FFFF (unused but necessary)
+	.word Reset			; add word (byte) to reset vector
+	.word Reset			; add garbage to complete $FFFF (unused but necessary)
